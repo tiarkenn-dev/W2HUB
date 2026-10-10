@@ -1,180 +1,465 @@
---========================================================--
--- W2HUB — FREE SCRIPT
--- Version: v1.0
--- Game: Violence District
--- Script Ini GRATIS — Jangan Dijual!
---========================================================--
+--============ W2HUB FREE SCRIPT v1.0 ============
+-- Script Ini GRATIS - Jangan Dijual!
+--================================================
 
 getgenv().W2HUB = getgenv().W2HUB or {}
 local W = getgenv()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local LP = Players.LocalPlayer
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local VIM = nil
+pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
-_G.W2_ACCENT     = Color3.fromRGB(255, 255, 255)
-_G.W2_ACCENT_BG  = Color3.fromRGB(0, 0, 0)
-_G.W2_NEUTRAL    = Color3.fromRGB(90, 90, 90)
-_G.W2_STROKE_OFF = Color3.fromRGB(25, 25, 25)
-_G.W2_BG_OFF     = Color3.fromRGB(0, 0, 0)
-
-local function __W2HUB_Init__()
-
-    local Players           = game:GetService("Players")
-    local RunService        = game:GetService("RunService")
-    local UserInputService  = game:GetService("UserInputService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local Workspace         = game:GetService("Workspace")
-    local CoreGui           = game:GetService("CoreGui")
-    local CollectionService = game:GetService("CollectionService")
-    local TweenService      = game:GetService("TweenService")
-    local GuiService        = game:GetService("GuiService")
-    local HttpService       = game:GetService("HttpService")
-    local Lighting          = game:GetService("Lighting")
-
-    local LP       = Players.LocalPlayer
-    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-    local VIM      = nil
-    pcall(function() VIM = game:GetService("VirtualInputManager") end)
-
-    W.Players = Players
-    W.RunService = RunService
-    W.UserInputService = UserInputService
-    W.ReplicatedStorage = ReplicatedStorage
-    W.Workspace = Workspace
-    W.CoreGui = CoreGui
-    W.CollectionService = CollectionService
-    W.TweenService = TweenService
-    W.GuiService = GuiService
-    W.HttpService = HttpService
-    W.Lighting = Lighting
-    W.LP = LP
-    W.isMobile = isMobile
-    W.VIM = VIM
-
-    -- === UILIB LOAD ===
-    local UILib
-    local ok, err = pcall(function()
-        UILib = loadstring(game:HttpGet("https://glutofree.vercel.app/library"))()
+local function LoadUILib()
+    local ok, lib = pcall(function()
+        return loadstring(game:HttpGet("https://glutofree.vercel.app/library"))()
     end)
-    if not ok or not UILib then
-        warn("[W2HUB] UILib gagal load:", err)
-        return
-    end
-    W.UILib = UILib
+    if ok and lib then return lib end
+    return nil
+end
+local UILib = LoadUILib()
+if not UILib then warn("[W2HUB] UILib gagal load"); return end
 
-    do
-        local function Fix(inst)
-            if not inst then return end
-            if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
-                local t = inst.Text
-                if t and (t:find("Gluto Windows", 1, true) or t:find("Gluto Window", 1, true)) then
-                    pcall(function()
-                        inst.Text = t:gsub("Gluto Windows", "Close"):gsub("Gluto Window", "Close")
-                    end)
-                end
+local function Notify(title, msg, dur)
+    pcall(function()
+        UILib:MakeNotify({
+            Title = title or "W2HUB",
+            Description = "Info",
+            Content = msg or "",
+            Color = Color3.fromRGB(255,255,255),
+            Time = 0.4,
+            Delay = dur or 2,
+            Icon = "138040631725974"
+        })
+    end)
+end
+W.Notify = Notify
+
+local function TeamIs(p, role)
+    if not p or not p.Team or not p.Team.Name then return false end
+    local t = string.lower(p.Team.Name)
+    if role == "Killer" then return t:find("killer",1,true) ~= nil end
+    if role == "Survivor" then return t:find("survivor",1,true) ~= nil end
+    return false
+end
+W.TeamIs = TeamIs
+
+local function GetRole()
+    if TeamIs(LP, "Killer") then return "Killer" end
+    if TeamIs(LP, "Survivor") then return "Survivor" end
+    return nil
+end
+W.GetRole = GetRole
+
+-- === WINDOW ===
+local Window = UILib:Window({
+    Title = "W2HUB",
+    LogoButtonSize = 52,
+    Image = "138040631725974",
+    Footer = "W2HUB",
+    Color = Color3.fromRGB(255,255,255),
+    ShowInfo = true,
+    Search = true,
+})
+
+Window:InfoTab({
+    Name = "Information",
+    Icon = "lightbulb",
+    SectionTitle = "Information",
+    Banner = "rbxassetid://138040631725974",
+    Cards = {
+        { Title = "SCRIPT INI GRATIS", Description = "Script 100% GRATIS!\n\nJANGAN DIJUAL\n\nYang jual = SCAMMER!" },
+    }
+})
+
+local TabSurv = Window:AddTab({ Name = "Survivor", Icon = "user" })
+local TabVis = Window:AddTab({ Name = "Visuals", Icon = "eye" })
+local TabKill = Window:AddTab({ Name = "Killer", Icon = "crosshair" })
+local TabMisc = Window:AddTab({ Name = "Misc", Icon = "settings-2" })
+local TabTroll = Window:AddTab({ Name = "Troll", Icon = "ghost" })
+local TabCfg = Window:AddTab({ Name = "Config", Icon = "save" })
+
+print("[W2HUB] Window Loaded")
+
+--============================================
+-- SELF HEAL
+--============================================
+local HealConn = nil
+local function DoHeal(state)
+    local c = LP.Character
+    if not c then return end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    pcall(function() ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(hrp, state) end)
+end
+local function SetSelfHeal(v)
+    if HealConn then HealConn:Disconnect(); HealConn = nil end
+    if v then
+        local active = false
+        HealConn = RunService.Heartbeat:Connect(function()
+            local c = LP.Character
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if not h then return end
+            if h.Health >= h.MaxHealth * 0.9 then
+                if active then active = false; DoHeal(false) end
+                return
             end
-        end
-        local function Scan(c)
-            if not c then return end
-            for _, d in ipairs(c:GetDescendants()) do Fix(d) end
-            c.DescendantAdded:Connect(Fix)
-        end
-        Scan(CoreGui)
-        if gethui then local ok2, hui = pcall(gethui); if ok2 and hui then Scan(hui) end end
-        Scan(LP:FindFirstChild("PlayerGui"))
-    end
+            if not active then active = true; DoHeal(true) end
+        end)
+    else DoHeal(false) end
+end
+W.SetSelfHeal = SetSelfHeal
 
-    -- === NOTIFY ===
-    local NotifyColor = Color3.fromRGB(255, 255, 255)
-    W.NotifyEnabled = W.NotifyEnabled ~= false
-
-    local function ShowNotify(title, msg, dur)
-        if not W.NotifyEnabled then return end
-        if not UILib or not UILib.MakeNotify then return end
-        pcall(function()
-            UILib:MakeNotify({
-                Title = title or "W2HUB",
-                Description = "Info",
-                Content = msg or "",
-                Color = NotifyColor,
-                Time = 0.4,
-                Delay = dur or 2,
-                Icon = "138040631725974"
-            })
+--============================================
+-- AUTO RUN
+--============================================
+local AutoRunConn = nil
+local function SetAutoRun(v)
+    if AutoRunConn then AutoRunConn:Disconnect(); AutoRunConn = nil end
+    if v and VIM then
+        AutoRunConn = RunService.Heartbeat:Connect(function()
+            pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, LP:GetMouse()) end)
         end)
     end
-    W.Notify = ShowNotify
-    W.W2_Notify = ShowNotify
-    W.ForceNotify = ShowNotify
+end
+W.SetAutoRun = SetAutoRun
 
-    -- === TEAM HELPER ===
-    local function TeamIs(plr, role)
-        if not plr or not plr.Team or not plr.Team.Name then return false end
-        local tn = string.lower(plr.Team.Name)
-        if role == "Killer"   then return tn:find("killer",   1, true) ~= nil end
-        if role == "Survivor" then return tn:find("survivor", 1, true) ~= nil end
-        return false
+--============================================
+-- GOD MODE
+--============================================
+local GodConn = nil
+local function SetGod(v)
+    if GodConn then GodConn:Disconnect(); GodConn = nil end
+    if v then
+        GodConn = RunService.Heartbeat:Connect(function()
+            local c = LP.Character
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if h and h.Health > 0 and h.Health < h.MaxHealth then
+                pcall(function() h.Health = h.MaxHealth end)
+            end
+        end)
     end
-    W.TeamIs = TeamIs
+end
+W.SetGod = SetGod
 
-    local function GetRole()
-        if TeamIs(LP, "Killer")   then return "Killer"   end
-        if TeamIs(LP, "Survivor") then return "Survivor" end
-        return nil
+--============================================
+-- SPEED BOOST
+--============================================
+local SBValue = 30
+local SBConn = nil
+local function SetSpeedBoost(v)
+    if SBConn then SBConn:Disconnect(); SBConn = nil end
+    if v then
+        SBConn = RunService.Heartbeat:Connect(function()
+            local c = LP.Character
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if h and h.Health > 0 and h.WalkSpeed ~= SBValue then
+                pcall(function() h.WalkSpeed = SBValue end)
+            end
+        end)
     end
-    W.GetRole = GetRole
+end
+W.SetSpeedBoost = SetSpeedBoost
 
-    W.GB_GetAllGenerators = function()
-        local gens = {}
-        local mf = Workspace:FindFirstChild("Map")
-        if not mf then return gens end
-        for _, obj in ipairs(mf:GetDescendants()) do
-            if obj:IsA("Model") and obj.Name == "Generator" then
-                if obj:GetAttribute("RepairProgress")
-                   or obj:GetAttribute("kickcount")
-                   or obj:GetAttribute("ProgressRepair") then
-                    table.insert(gens, obj)
+--============================================
+-- FULL ESP
+--============================================
+W.ESP = { Survivor = false, Killer = false, Generator = false, Pallet = false, Distance = 500 }
+W.ESPColors = {
+    Survivor = Color3.fromRGB(0,190,255),
+    Killer = Color3.fromRGB(255,0,0),
+    Generator = Color3.fromRGB(255,255,0),
+    Pallet = Color3.fromRGB(255,165,0),
+}
+local ESPObjects = {}
+local function CreateESP(obj, color)
+    if not obj or not obj.Parent then return end
+    if ESPObjects[obj] then
+        ESPObjects[obj].FillColor = color
+        ESPObjects[obj].OutlineColor = color
+        return
+    end
+    local h = Instance.new("Highlight")
+    h.FillColor = color; h.OutlineColor = color
+    h.FillTransparency = 0.9; h.OutlineTransparency = 0.3
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = obj
+    ESPObjects[obj] = h
+end
+local function RemoveESP(obj)
+    if ESPObjects[obj] then pcall(function() ESPObjects[obj]:Destroy() end); ESPObjects[obj] = nil end
+end
+
+RunService.RenderStepped:Connect(function()
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local d = (hrp.Position - myRoot.Position).Magnitude
+                if d <= W.ESP.Distance then
+                    if W.ESP.Survivor and TeamIs(p, "Survivor") then
+                        CreateESP(p.Character, W.ESPColors.Survivor)
+                    elseif W.ESP.Killer and TeamIs(p, "Killer") then
+                        CreateESP(p.Character, W.ESPColors.Killer)
+                    else RemoveESP(p.Character) end
+                else RemoveESP(p.Character) end
+            end
+        end
+    end
+    if W.ESP.Generator then
+        local map = Workspace:FindFirstChild("Map")
+        if map then
+            for _, obj in ipairs(map:GetDescendants()) do
+                if obj:IsA("Model") and obj.Name == "Generator" then
+                    local pos = obj:GetPivot().Position
+                    if (pos - myRoot.Position).Magnitude <= W.ESP.Distance then
+                        CreateESP(obj, W.ESPColors.Generator)
+                    else RemoveESP(obj) end
                 end
             end
         end
-        return gens
     end
-    W.GB_GetPoints = function(m)
-        local pts = {}
-        if not m then return pts end
-        for _, o in ipairs(m:GetChildren()) do
-            if o:IsA("BasePart") and o.Name:find("GeneratorPoint") then
-                table.insert(pts, o)
+    if W.ESP.Pallet then
+        local map = Workspace:FindFirstChild("Map")
+        if map then
+            for _, obj in ipairs(map:GetDescendants()) do
+                if obj.Name == "Palletwrong" and obj:IsA("Model") then
+                    local pos = obj:GetPivot().Position
+                    if (pos - myRoot.Position).Magnitude <= W.ESP.Distance then
+                        CreateESP(obj, W.ESPColors.Pallet)
+                    else RemoveESP(obj) end
+                end
             end
         end
-        return pts
     end
+end)
 
-    W.IsDowned = function(char)
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return true end
-        local s = char:GetAttribute("State")
-        return s == "Downed" or s == "Dead"
+--============================================
+-- FULLBRIGHT
+--============================================
+local OrigBright = Lighting.Brightness
+local OrigClock = Lighting.ClockTime
+local OrigAmbient = Lighting.Ambient
+local function SetFullbright(v)
+    if v then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.Ambient = Color3.fromRGB(255,255,255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+    else
+        Lighting.Brightness = OrigBright
+        Lighting.ClockTime = OrigClock
+        Lighting.Ambient = OrigAmbient
     end
+end
+W.SetFullbright = SetFullbright
 
-    W._Ctx = {
-        Players = Players,
-        RunService = RunService,
-        UserInputService = UserInputService,
-        ReplicatedStorage = ReplicatedStorage,
-        Workspace = Workspace,
-        CoreGui = CoreGui,
-        CollectionService = CollectionService,
-        TweenService = TweenService,
-        GuiService = GuiService,
-        HttpService = HttpService,
-        Lighting = Lighting,
-        LP = LP,
-        isMobile = isMobile,
-        VIM = VIM,
-        UILib = UILib,
-    }
+--============================================
+-- AUTO ATTACK (KILLER)
+--============================================
+local AAConn = nil
+local AARange = 12
+local function SetAutoAttack(v)
+    if AAConn then AAConn:Disconnect(); AAConn = nil end
+    if v then
+        local last = 0
+        AAConn = RunService.Heartbeat:Connect(function()
+            if GetRole() ~= "Killer" then return end
+            local now = tick()
+            if now - last < 0.15 then return end
+            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and TeamIs(p, "Survivor") and p.Character then
+                    local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                    local h = p.Character:FindFirstChildOfClass("Humanoid")
+                    if hrp and h and h.Health > 35 then
+                        if (hrp.Position - myRoot.Position).Magnitude <= AARange then
+                            last = now
+                            pcall(function()
+                                local a = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Attacks") and ReplicatedStorage.Remotes.Attacks:FindFirstChild("BasicAttack")
+                                if a then a:FireServer(false) end
+                            end)
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
+W.SetAutoAttack = SetAutoAttack
 
-    print("[W2HUB] PART 1 Loaded OK")
+--============================================
+-- BOMBAX MUSIC PLAYER
+--============================================
+W.Bombax = W.Bombax or {
+    Enabled = false, Current = nil, Selected = "One", Volume = 2, Looped = true,
+    Songs = {
+        {id="101985596918228", judul="One"},
+        {id="78520199502339",  judul="Two"},
+        {id="78253224480952",  judul="Three"},
+        {id="136949217768985", judul="Four"},
+        {id="92143860315842",  judul="Five"},
+        {id="96568301359656",  judul="Six"},
+        {id="96053601899287",  judul="Seven"},
+        {id="116537762304510", judul="Eight"},
+        {id="111775377151665", judul="Nine"},
+        {id="131317416582166", judul="Ten"},
+        {id="80210594606101",  judul="Danza Kuduro"},
+        {id="135887188304832", judul="Ada Yang Tumbang Jos Jis"},
+        {id="89338419772018",  judul="Habibi Ishqi"},
+        {id="93652038633690",  judul="Santai Dulu"},
+        {id="126810420971446", judul="Anak Kota"},
+        {id="110337096446518", judul="DJ Onia"},
+    },
+}
+local BX = W.Bombax
 
--- PART 2-15 DISISIPKAN DI SINI (JANGAN TUTUP FUNCTION DULU!)    --====================================================--
+local function BombaxStop()
+    if BX.Current then
+        pcall(function() BX.Current:Stop() end)
+        pcall(function() BX.Current:Destroy() end)
+        BX.Current = nil
+    end
+    BX.Playing = false
+end
+local function BombaxPlay(title)
+    BombaxStop()
+    title = title or BX.Selected
+    local song = nil
+    for _, s in ipairs(BX.Songs) do
+        if s.judul == title then song = s; break end
+    end
+    if not song then return end
+    local c = LP.Character
+    if not c then return end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local snd = Instance.new("Sound")
+    snd.SoundId = "rbxassetid://" .. song.id
+    snd.Volume = BX.Volume
+    snd.Looped = BX.Looped
+    snd.Parent = hrp
+    snd:Play()
+    BX.Current = snd
+    BX.Playing = true
+    BX.Selected = title
+end
+W.BombaxPlay = BombaxPlay
+W.BombaxStop = BombaxStop
+
+--============================================
+-- TAB SURVIVOR UI
+--============================================
+local s1 = TabSurv:AddSection("Self Heal")
+s1:AddToggle({ Title = "Enable Self Heal", Default = false, Callback = function(v)
+    SetSelfHeal(v)
+    Notify("W2HUB", "Self Heal " .. (v and "ON" or "OFF"), 2)
+end })
+
+local s2 = TabSurv:AddSection("Auto Run")
+s2:AddToggle({ Title = "Auto Run", Default = false, Callback = function(v)
+    SetAutoRun(v)
+    Notify("W2HUB", "Auto Run " .. (v and "ON" or "OFF"), 2)
+end })
+
+local s3 = TabSurv:AddSection("Speed Boost")
+s3:AddToggle({ Title = "Enable Speed Boost", Default = false, Callback = function(v)
+    SetSpeedBoost(v)
+    Notify("W2HUB", "Speed Boost " .. (v and "ON" or "OFF"), 2)
+end })
+s3:AddSlider({ Title = "Speed Value", Min = 16, Max = 100, Default = 30, Increment = 1,
+    Callback = function(v) SBValue = v end })
+
+local s4 = TabSurv:AddSection("God Mode")
+s4:AddToggle({ Title = "Enable God Mode", Default = false, Callback = function(v)
+    SetGod(v)
+    Notify("W2HUB", "God Mode " .. (v and "ON" or "OFF"), 2)
+end })
+
+--============================================
+-- TAB VISUALS UI
+--============================================
+local v1 = TabVis:AddSection("ESP System")
+v1:AddToggle({ Title = "ESP Survivor", Default = false, Callback = function(v) W.ESP.Survivor = v end })
+v1:AddColorPicker({ Title = "Survivor Color", Default = W.ESPColors.Survivor, Save = false,
+    Callback = function(c) W.ESPColors.Survivor = c end })
+v1:AddToggle({ Title = "ESP Killer", Default = false, Callback = function(v) W.ESP.Killer = v end })
+v1:AddColorPicker({ Title = "Killer Color", Default = W.ESPColors.Killer, Save = false,
+    Callback = function(c) W.ESPColors.Killer = c end })
+v1:AddToggle({ Title = "ESP Generator", Default = false, Callback = function(v) W.ESP.Generator = v end })
+v1:AddToggle({ Title = "ESP Pallet", Default = false, Callback = function(v) W.ESP.Pallet = v end })
+v1:AddSlider({ Title = "ESP Radius", Min = 50, Max = 1000, Default = 500, Increment = 10,
+    Callback = function(v) W.ESP.Distance = v end })
+
+local v2 = TabVis:AddSection("Graphics")
+v2:AddToggle({ Title = "Fullbright", Default = false, Callback = function(v) SetFullbright(v) end })
+
+--============================================
+-- TAB KILLER UI
+--============================================
+local k1 = TabKill:AddSection("Auto Attack")
+k1:AddToggle({ Title = "Enable Auto Attack", Default = false, Callback = function(v)
+    SetAutoAttack(v)
+    Notify("W2HUB", "Auto Attack " .. (v and "ON" or "OFF"), 2)
+end })
+k1:AddSlider({ Title = "Range", Min = 5, Max = 30, Default = 12, Increment = 1,
+    Callback = function(v) AARange = v end })
+
+--============================================
+-- TAB MISC UI
+--============================================
+local m1 = TabMisc:AddSection("Info")
+m1:AddParagraph({ Title = "W2HUB", Content = "Script Ini GRATIS!\nJangan Dijual!" })
+
+--============================================
+-- TAB TROLL UI
+--============================================
+local t1 = TabTroll:AddSection("Bombax Music Player")
+local songList = {}
+for _, s in ipairs(BX.Songs) do table.insert(songList, s.judul) end
+t1:AddToggle({ Title = "Enable Bombax", Default = false, Callback = function(v)
+    BX.Enabled = v
+    if v then BombaxPlay() else BombaxStop() end
+end })
+t1:AddDropdown({ Title = "Select Song", Options = songList, Default = "One",
+    Callback = function(v)
+        local val = type(v) == "table" and v[1] or v
+        BX.Selected = val
+        if BX.Enabled then BombaxPlay(val) end
+    end })
+t1:AddSlider({ Title = "Volume", Min = 0, Max = 10, Default = 2, Increment = 0.5,
+    Callback = function(v) BX.Volume = v; if BX.Current then pcall(function() BX.Current.Volume = v end) end end })
+t1:AddToggle({ Title = "Looped", Default = true, Callback = function(v)
+    BX.Looped = v
+    if BX.Current then pcall(function() BX.Current.Looped = v end) end
+end })
+t1:AddButton({ Title = "Stop", Callback = function() BombaxStop() end })
+
+--============================================
+-- TAB CONFIG UI
+--============================================
+local c1 = TabCfg:AddSection("Config Info")
+c1:AddParagraph({ Title = "Cara Pakai", Content = "Save/Load config ke folder W2HUB/Config\n\nButuh executor support writefile." })
+
+--============================================
+-- CLOSING
+--============================================
+print("[W2HUB] Loaded OK - v1.0")
+Notify("W2HUB", "Script Loaded! v1.0", 6)    --====================================================--
     -- PART 2: WINDOW + TAB SETUP
     --====================================================--
 

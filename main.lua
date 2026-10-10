@@ -53,10 +53,12 @@ local function __W2HUB_Init__()
     local ok, err = pcall(function()
         UILib = loadstring(game:HttpGet("https://glutofree.vercel.app/library"))()
     end)
-    if not ok or not UILib then warn("[W2HUB] UILib gagal load:", err); return end
+    if not ok or not UILib then
+        warn("[W2HUB] UILib gagal load:", err)
+        return
+    end
     W.UILib = UILib
 
-    -- Fix "Gluto Window" text jadi "Close"
     do
         local function Fix(inst)
             if not inst then return end
@@ -101,7 +103,6 @@ local function __W2HUB_Init__()
     W.Notify = ShowNotify
     W.W2_Notify = ShowNotify
     W.ForceNotify = ShowNotify
-    W.NotifyFunc = ShowNotify
 
     -- === TEAM HELPER ===
     local function TeamIs(plr, role)
@@ -120,7 +121,6 @@ local function __W2HUB_Init__()
     end
     W.GetRole = GetRole
 
-    -- === GENERATOR HELPERS ===
     W.GB_GetAllGenerators = function()
         local gens = {}
         local mf = Workspace:FindFirstChild("Map")
@@ -147,7 +147,6 @@ local function __W2HUB_Init__()
         return pts
     end
 
-    -- === DOWNED HELPER ===
     W.IsDowned = function(char)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return true end
@@ -155,7 +154,6 @@ local function __W2HUB_Init__()
         return s == "Downed" or s == "Dead"
     end
 
-    -- Simpan referensi ke W biar bisa diakses part selanjutnya
     W._Ctx = {
         Players = Players,
         RunService = RunService,
@@ -176,11 +174,7 @@ local function __W2HUB_Init__()
 
     print("[W2HUB] PART 1 Loaded OK")
 
--- PART 2-17 DISISIPKAN DI SINI
-
-end
-
-__W2HUB_Init__()    --====================================================--
+-- PART 2-15 DISISIPKAN DI SINI (JANGAN TUTUP FUNCTION DULU!)    --====================================================--
     -- PART 2: WINDOW + TAB SETUP
     --====================================================--
 
@@ -8494,7 +8488,7 @@ __W2HUB_Init__()    --====================================================--
     print("[W2HUB] PART 14 Loaded OK")
 
 -- PART 15-17 DISISIPKAN DI SINI    --====================================================--
-    -- PART 15: CONFIG + INFO + CLOSING
+    -- PART 15: CONFIG + HOOK + CLOSING
     --====================================================--
 
     -- === CONFIG MANAGER ===
@@ -8516,8 +8510,8 @@ __W2HUB_Init__()    --====================================================--
             local l = {}
             if listfiles then
                 EnsureFolder()
-                local ok, files = pcall(listfiles, FolderPath())
-                if ok and files then
+                local ok2, files = pcall(listfiles, FolderPath())
+                if ok2 and files then
                     for _, f in ipairs(files) do
                         local n = string.match(f, "([^/\\]+)%.json$")
                         if n and n ~= "_autoload" then table.insert(l, n) end
@@ -8604,7 +8598,7 @@ __W2HUB_Init__()    --====================================================--
             Content = "• Save: tulis nama, klik Save\n• Load: pilih dropdown, klik Load\n• Auto Save: simpan otomatis\n• Auto Load: load saat start" })
     end
 
-    -- === GLOBAL HOOK (No Fall + Anti Blind + Veil + Flask + Unlock Carry) ===
+    -- === GLOBAL HOOK (No Fall + Anti Blind) ===
     do
         task.spawn(function()
             pcall(function()
@@ -8614,19 +8608,17 @@ __W2HUB_Init__()    --====================================================--
                     local method = getnamecallmethod()
                     if checkcaller() then return oldNC(self, ...) end
 
-                    -- 1. No Fall Damage
                     if method == "FireServer" and W.NoFallDamage then
-                        local ok, n = pcall(function() return self.Name end)
-                        if ok and n == "Fall" then
+                        local ok2, n = pcall(function() return self.Name end)
+                        if ok2 and n == "Fall" then
                             local par = self.Parent
                             if par and par.Name == "Mechanics" then return nil end
                         end
                     end
 
-                    -- 2. Anti Blind
                     if method == "FireServer" and W.AntiBlind then
-                        local ok, n = pcall(function() return self.Name end)
-                        if ok and n == "GotBlinded" then
+                        local ok2, n = pcall(function() return self.Name end)
+                        if ok2 and n == "GotBlinded" then
                             local par = self.Parent
                             if par and par.Name == "Flashlight" and GetRole() == "Killer" then
                                 return nil
@@ -8640,14 +8632,9 @@ __W2HUB_Init__()    --====================================================--
         end)
     end
 
-    -- === INFO TAB UPDATE ===
-    -- Info tab sudah dibikin di PART 2, jadi gak perlu diulang
-
     -- === CLOSING ===
     print("[W2HUB] Loaded OK — v1.0")
     print("  Tab: Survivor / Visuals / Killer / Misc / Troll / Config")
-    print("  Bombax: 32 lagu")
-    print("  Floating Buttons: 10")
     print("  Script Ini GRATIS — Jangan Dijual!")
 
     ShowNotify("W2HUB", "Script Loaded! v1.0", 6)
